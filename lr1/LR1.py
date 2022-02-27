@@ -2,16 +2,33 @@ from typing import Optional, Tuple, Union
 import numpy as np
 from PIL import Image
 
+from lr1.Parser import Parser
+
 
 class OBJ3DModel:
     def __init__(self):
         self.img_arr: Optional[np.ndarray] = None
+        self.polIndex: Optional[np.ndarray] = None
+        self.img = MyImage()
 
     def read_model(self, path: str):
-        pass
+        self.img_arr = Parser.getVertexes(path)
+        self.polIndex = Parser.getPolygons(path)
 
     def arr_init(self):
         self.img_arr = np.zeros((self.height, self.width, self.channels), dtype=np.uint8)
+
+    def draw_edges(self, path: str):
+        self.read_model(path)
+        for pol in self.polIndex:
+            self.img.draw_line_v4(self.img_arr[pol[0] - 1].x - 650, self.img_arr[pol[0] - 1].y * (-1),
+                                 self.img_arr[pol[1] - 1].x - 650, self.img_arr[pol[1] - 1].y * (-1), (255, 255, 255))
+            self.img.draw_line_v4(self.img_arr[pol[1] - 1].x - 650, self.img_arr[pol[1] - 1].y * (-1),
+                                 self.img_arr[pol[2] - 1].x - 650,
+                                 self.img_arr[pol[2] - 1].y * (-1), (255, 255, 255))
+            self.img.draw_line_v4(self.img_arr[pol[2] - 1].x - 650, self.img_arr[pol[2] - 1].y * (-1),
+                                 self.img_arr[pol[0] - 1].x - 650,
+                                 self.img_arr[pol[0] - 1].y * (-1), (255, 255, 255))
 
 
 class MyImage:
@@ -21,7 +38,6 @@ class MyImage:
         self.height: int = 0
         self.channels: int = 3
         self.delta_t: float = 0.01
-        self.obj3D = OBJ3DModel()
 
     # инициализация массива методом библиотеки numpy
     def arr_init(self):
@@ -138,17 +154,25 @@ if __name__ == "__main__":
                 arr4[i, j, k] = (i + j + k) % 256
     image4 = Image.fromarray(arr4, 'RGB')
     # image4.show()
-    img = MyImage()
-    img.width = 200
-    img.height = 200
-    img.arr_init()
-    img.draw_star(img.draw_line_v1)
-    img.save("lr1/1.jpg")
-    img.draw_star(img.draw_line_v2)
-    img.save("lr1/2.jpg")
-    img.draw_star(img.draw_line_v3)
-    img.save("lr1/3.jpg")
-    img.draw_star(img.draw_line_v4)
-    img.save("lr1/4.jpg")
+    # img = MyImage()
+    # img.width = 200
+    # img.height = 200
+    # img.arr_init()
+    # img.draw_star(img.draw_line_v1)
+    # img.save("lr1/1.jpg")
+    # img.draw_star(img.draw_line_v2)
+    # img.save("lr1/2.jpg")
+    # img.draw_star(img.draw_line_v3)
+    # img.save("lr1/3.jpg")
+    # img.draw_star(img.draw_line_v4)
+    # img.save("lr1/4.jpg")
     # img.draw_line_v4(125, 0, 125, 225, (255, 255, 255))
     # img.imshow()
+
+    obj = OBJ3DModel()
+    obj.img.width = 1600
+    obj.img.height = 1600
+    obj.img.arr_init()
+    obj.draw_edges("deer.obj")
+    obj.img.imshow()
+    pass
