@@ -11,8 +11,7 @@ class OBJ3DModel:
         pass
 
     def arr_init(self):
-        self.img_arr = np.zeros((self.height, self.width,
-                                 self.channels), dtype=np.uint8)
+        self.img_arr = np.zeros((self.height, self.width, self.channels), dtype=np.uint8)
 
 
 class MyImage:
