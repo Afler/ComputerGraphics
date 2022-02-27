@@ -1,6 +1,6 @@
-from PIL import Image
-import numpy as np
 from typing import Optional, Tuple, Union
+import numpy as np
+from PIL import Image
 
 
 class OBJ3DModel:
@@ -33,16 +33,16 @@ class MyImage:
     def set_pixel(self, x: int, y: int, color: Union[Tuple[int, int, int], int] = (0, 0, 0)):
         self.img_arr[y, x, :] = color
 
-    # конвертация массива в объект класса Image библиотеки Pillow и вывод на экран
+    # Конвертация массива в объект класса Image библиотеки Pillow и вывод на экран
     # см. https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.show
     def imshow(self):
         Image.fromarray(self.img_arr, 'RGB').show()
 
-    # конвертация массива в объект класса Image библиотеки Pillow и сохранение его
+    # Конвертация массива в объект класса Image библиотеки Pillow и сохранение его
     # см. https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.save
-    def save(self, path: str):
+    def save(self, path):
         im = Image.fromarray(self.img_arr, 'RGB')
-        im.save()
+        im.save(path)
 
     # рисование линии, первый вариант алгоритма
     def draw_line_v1(self, x0: int, y0: int, x1: int, y1: int, color: Union[Tuple[int, int, int], int]):
@@ -78,7 +78,7 @@ class MyImage:
             else:
                 self.set_pixel(int(x), int(y), color)
 
-    # рисование линии, четвертый вариант алгоритма (алгоримтм Брезенхема)
+    # рисование линии, четвертый вариант алгоритма (алгоритм Брезенхема)
     def draw_line_v4(self, x0: int, y0: int, x1: int, y1: int, color: Union[Tuple[int, int, int], int]):
         steep = False
         if np.abs(x0 - x1) < np.abs(y0 - y1):
@@ -119,7 +119,6 @@ class MyImage:
 
 
 if __name__ == "__main__":
-    print("hi guys")
     w = 128
     h = 128
     arr = np.zeros((h, w), dtype=np.uint8)
@@ -141,9 +140,16 @@ if __name__ == "__main__":
     image4 = Image.fromarray(arr4, 'RGB')
     # image4.show()
     img = MyImage()
-    img.width = 900
-    img.height = 900
+    img.width = 200
+    img.height = 200
     img.arr_init()
-    # img.draw_star(img.draw_line_v1)
-    img.draw_line_v1(125, 0, 125, 225, (255, 255, 255))
-    img.imshow()
+    img.draw_star(img.draw_line_v1)
+    img.save("lr1/1.jpg")
+    img.draw_star(img.draw_line_v2)
+    img.save("lr1/2.jpg")
+    img.draw_star(img.draw_line_v3)
+    img.save("lr1/3.jpg")
+    img.draw_star(img.draw_line_v4)
+    img.save("lr1/4.jpg")
+    # img.draw_line_v4(125, 0, 125, 225, (255, 255, 255))
+    # img.imshow()
