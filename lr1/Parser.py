@@ -12,7 +12,7 @@ class Parser:
                 vertexList.append(row)
         coordList = []
         for vertex in vertexList:
-            coordinates = vertex.split(" ");
+            coordinates = vertex.split(" ")
             coordList.append(Coordinate(float(coordinates[1]), float(coordinates[2]), float(coordinates[3])))
         return coordList
 
@@ -26,9 +26,9 @@ class Parser:
                 polygonList.append(row)
         resultList = []
         for polRow in polygonList:
-            vertexIndexes = polRow.split(" ");
+            vertexIndexes = polRow.split(" ")
             vertexIndex1 = vertexIndexes[1].split("/")[0]
             vertexIndex2 = vertexIndexes[2].split("/")[0]
             vertexIndex3 = vertexIndexes[3].split("/")[0]
-            resultList.append([int(vertexIndex1),int(vertexIndex2), int(vertexIndex3)])
+            resultList.append([int(vertexIndex1), int(vertexIndex2), int(vertexIndex3)])
         return resultList

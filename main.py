@@ -1,4 +1,5 @@
 from typing import Optional, Tuple, Union
+
 import numpy as np
 from PIL import Image
 
@@ -7,28 +8,47 @@ from lr1.Parser import Parser
 
 class OBJ3DModel:
     def __init__(self):
-        self.img_arr: Optional[np.ndarray] = None
-        self.polIndex: Optional[np.ndarray] = None
+        self.vertexList: Optional[np.ndarray] = None
+        self.polyVertexIndexesList: Optional[np.ndarray] = None
         self.img = MyImage()
 
     def read_model(self, path: str):
-        self.img_arr = Parser.getVertexes(path)
-        self.polIndex = Parser.getPolygons(path)
+        self.vertexList = Parser.getVertexes(path)
+        self.polyVertexIndexesList = Parser.getPolygons(path)
 
     def arr_init(self):
-        self.img_arr = np.zeros((self.height, self.width, self.channels), dtype=np.uint8)
+        self.vertexList = np.zeros((self.height, self.width, self.channels), dtype=np.uint8)
 
-    def draw_edges(self, path: str):
+    def draw_edges_v1(self, path: str, displacementX=0, displacementY=0, scaleX=1, scaleY=1):
         self.read_model(path)
-        for pol in self.polIndex:
-            self.img.draw_line_v4(self.img_arr[pol[0] - 1].x - 650, self.img_arr[pol[0] - 1].y * (-1),
-                                 self.img_arr[pol[1] - 1].x - 650, self.img_arr[pol[1] - 1].y * (-1), (255, 255, 255))
-            self.img.draw_line_v4(self.img_arr[pol[1] - 1].x - 650, self.img_arr[pol[1] - 1].y * (-1),
-                                 self.img_arr[pol[2] - 1].x - 650,
-                                 self.img_arr[pol[2] - 1].y * (-1), (255, 255, 255))
-            self.img.draw_line_v4(self.img_arr[pol[2] - 1].x - 650, self.img_arr[pol[2] - 1].y * (-1),
-                                 self.img_arr[pol[0] - 1].x - 650,
-                                 self.img_arr[pol[0] - 1].y * (-1), (255, 255, 255))
+        for vertexIndexes in self.polyVertexIndexesList:
+            self.img.draw_line_v4(scaleX * self.vertexList[vertexIndexes[0] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[0] - 1].y - displacementY,
+                                  scaleX * self.vertexList[vertexIndexes[1] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[1] - 1].y - displacementY,
+                                  (255, 255, 255))
+            self.img.draw_line_v4(scaleX * self.vertexList[vertexIndexes[1] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[1] - 1].y - displacementY,
+                                  scaleX * self.vertexList[vertexIndexes[2] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[2] - 1].y, (255, 255, 255))
+            self.img.draw_line_v4(scaleX * self.vertexList[vertexIndexes[2] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[2] - 1].y - displacementY,
+                                  scaleX * self.vertexList[vertexIndexes[0] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[0] - 1].y - displacementY,
+                                  (255, 255, 255))
+
+    def draw_edges_v2(self, path: str, displacementX=0, displacementY=0, scaleX=1, scaleY=1):
+        self.read_model(path)
+        i = 1
+        for vertexIndexes in self.polyVertexIndexesList:
+            self.img.drawTriangle(scaleX * self.vertexList[vertexIndexes[0] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[0] - 1].y - displacementY,
+                                  scaleX * self.vertexList[vertexIndexes[1] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[1] - 1].y - displacementY,
+                                  scaleX * self.vertexList[vertexIndexes[2] - 1].x - displacementX,
+                                  scaleY * self.vertexList[vertexIndexes[2] - 1].y - displacementY,
+                                  (i % 255, (i + 50) % 255, (i + 100) % 255))
+            i = i + 20
 
 
 class MyImage:
@@ -105,7 +125,7 @@ class MyImage:
             y0, y1 = y1, y0
         dx = x1 - x0
         dy = y1 - y0
-        derror = np.abs(dy / (float)(dx))
+        derror = np.abs(dy / float(dx))
         error = 0
         y = y0
         for x in range(int(x0), int(x1), 1):
@@ -132,8 +152,32 @@ class MyImage:
     def draw_edges(self):
         pass
 
+    def drawTriangle(self, x0, y0, x1, y1, x2, y2, color: Tuple[int, int, int] = (255, 255, 255)):
+        xmin = min(x0, x1, x2) if min(x0, x1, x2) < 0 else 0
+        ymin = min(y0, y1, y2) if min(y0, y1, y2) < 0 else 0
+        xmax = max(x0, x1, x2) if max(x0, x1, x2) < self.width else self.width
+        ymax = max(y0, y1, y2) if max(y0, y1, y2) < self.height else self.height
+        for xIndex in range(round(xmin), round(xmax)):
+            for yIndex in range(round(ymin), round(ymax)):
+                bar1, bar2, bar3 = convertToBarycentric(xIndex, yIndex, x0, y0, x1, y1, x2, y2)
+                if bar1 > 0 and bar2 > 0 and bar3 > 0:
+                    self.set_pixel(xIndex, yIndex, color)
+        pass
 
-if __name__ == "__main__":
+
+def convertToBarycentric(x, y, x0: float, y0: float, x1: float, y1: float, x2: float, y2: float, eps=0.1):
+    lambda0 = ((x1 - x2) * (y - y2) - (y1 - y2) * (x - x2)) / ((x1 - x2) * (y0 - y2) - (y1 - y2) * (x0 - x2))
+    lambda1 = ((x2 - x0) * (y - y0) - (y2 - y0) * (x - x0)) / ((x2 - x0) * (y1 - y0) - (y2 - y0) * (x1 - x0))
+    lambda2 = ((x0 - x1) * (y - y1) - (y0 - y1) * (x - x1)) / ((x0 - x1) * (y2 - y1) - (y0 - y1) * (x2 - x1))
+    if abs(lambda0 + lambda1 + lambda2 - 1.0) < eps:
+        return lambda0, lambda1, lambda2
+    else:
+        print(str(lambda0) + ' + ' + str(lambda1) + ' + ' + str(lambda2) + ' = ' + str(lambda2 + lambda1 + lambda0))
+        print("Сумма барицентрических координат не равняется 1")
+        return 0, 0, 0
+
+
+def doLR1():
     w = 128
     h = 128
     arr = np.zeros((h, w), dtype=np.uint8)
@@ -154,25 +198,40 @@ if __name__ == "__main__":
                 arr4[i, j, k] = (i + j + k) % 256
     image4 = Image.fromarray(arr4, 'RGB')
     # image4.show()
-    # img = MyImage()
-    # img.width = 200
-    # img.height = 200
-    # img.arr_init()
-    # img.draw_star(img.draw_line_v1)
-    # img.save("lr1/1.jpg")
-    # img.draw_star(img.draw_line_v2)
-    # img.save("lr1/2.jpg")
-    # img.draw_star(img.draw_line_v3)
-    # img.save("lr1/3.jpg")
-    # img.draw_star(img.draw_line_v4)
-    # img.save("lr1/4.jpg")
-    # img.draw_line_v4(125, 0, 125, 225, (255, 255, 255))
-    # img.imshow()
-
+    img = MyImage()
+    img.width = 1000
+    img.height = 1000
+    img.arr_init()
+    img.draw_star(img.draw_line_v1)
+    img.save("lr1/1.jpg")
+    img.draw_star(img.draw_line_v2)
+    img.save("lr1/2.jpg")
+    img.draw_star(img.draw_line_v3)
+    img.save("lr1/3.jpg")
+    img.draw_star(img.draw_line_v4)
+    img.save("lr1/4.jpg")
+    img.draw_line_v4(125, 0, 125, 225, (255, 255, 255))
     obj = OBJ3DModel()
     obj.img.width = 1600
     obj.img.height = 1600
     obj.img.arr_init()
-    obj.draw_edges("deer.obj")
+    obj.draw_edges_v1("lr1/deer.obj", 650, 0, 1, -1)
+    obj.img.save("lr1/deer.jpg")
     obj.img.imshow()
+
+
+def doLR2():
+    # drawTriangle(300, 500, 20, 30, 150, 700)
+    obj = OBJ3DModel()
+    obj.img.width = 1600
+    obj.img.height = 1600
+    obj.img.arr_init()
+    # obj.draw_edges_v1("lr1/deer.obj", 650, 0, 1, -1)
+    obj.draw_edges_v2("lr1/deer.obj", 650, 0, 1, -1)
+    obj.img.save("lr2/deer_colored.jpg")
+    obj.img.imshow()
+
+
+if __name__ == "__main__":
+    doLR2()
     pass
