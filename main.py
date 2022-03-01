@@ -6,6 +6,18 @@ from PIL import Image
 from lr1.Parser import Parser
 
 
+def calculateNormal(x0, y0, z0, x1, y1, z1, x2, y2, z2):
+    nx = (y1 - y0) * (z1 - z2) - (z1 - z0) * (y1 - y2)
+    ny = (x1 - x0) * (z1 - z2) - (z1 - z0) * (x1 - x2)
+    nz = (x1 - x0) * (y1 - y2) - (y1 - y0) * (x1 - x2)
+    return nx, ny, nz
+
+
+def scalarProduct(x0, y0, z0, x1, y1, z1):
+    res = (x0 * x1 + y0 * y1 + z0 * z1) / (np.sqrt(x0 * x0 + y0 * y0 + z0 * z0) * np.sqrt(x1 * x1 + y1 * y1 + z1 * z1))
+    return res
+
+
 class OBJ3DModel:
     def __init__(self):
         self.vertexList: Optional[np.ndarray] = None
@@ -50,6 +62,32 @@ class OBJ3DModel:
                                   (i % 255, (i + 50) % 255, (i + 100) % 255))
             i = i + 20
 
+    def draw_edges_v3(self, path: str, displacementX=0, displacementY=0, scaleX=1, scaleY=1):
+        self.read_model(path)
+        i = 1
+        for vertexIndexes in self.polyVertexIndexesList:
+            nx, ny, nz = calculateNormal(self.vertexList[vertexIndexes[0] - 1].x,
+                                         self.vertexList[vertexIndexes[0] - 1].y,
+                                         self.vertexList[vertexIndexes[0] - 1].z,
+                                         self.vertexList[vertexIndexes[1] - 1].x,
+                                         self.vertexList[vertexIndexes[1] - 1].y,
+                                         self.vertexList[vertexIndexes[1] - 1].z,
+                                         self.vertexList[vertexIndexes[2] - 1].x,
+                                         self.vertexList[vertexIndexes[2] - 1].y,
+                                         self.vertexList[vertexIndexes[2] - 1].z)
+            sProduct = scalarProduct(nx, ny, nz, 0, 0, 1)
+            if (sProduct < 0):
+                self.img.drawTriangle_v2(scaleX * self.vertexList[vertexIndexes[0] - 1].x - displacementX,
+                                         scaleY * self.vertexList[vertexIndexes[0] - 1].y - displacementY,
+                                         self.vertexList[vertexIndexes[0] - 1].z,
+                                         scaleX * self.vertexList[vertexIndexes[1] - 1].x - displacementX,
+                                         scaleY * self.vertexList[vertexIndexes[1] - 1].y - displacementY,
+                                         self.vertexList[vertexIndexes[1] - 1].z,
+                                         scaleX * self.vertexList[vertexIndexes[2] - 1].x - displacementX,
+                                         scaleY * self.vertexList[vertexIndexes[2] - 1].y - displacementY,
+                                         self.vertexList[vertexIndexes[2] - 1].z,
+                                         self.img.zBuffer, (255 * sProduct, 0, 0))
+
 
 class MyImage:
     def __init__(self):
@@ -58,6 +96,12 @@ class MyImage:
         self.height: int = 0
         self.channels: int = 3
         self.delta_t: float = 0.01
+        self.zBuffer: Optional[np.ndarray] = None
+
+    # инициализация z буфера
+    def zBuffer_init(self):
+        self.zBuffer = np.zeros((self.height, self.width), dtype=np.float)
+        self.zBuffer[:, :] = 255
 
     # инициализация массива методом библиотеки numpy
     def arr_init(self):
@@ -164,6 +208,22 @@ class MyImage:
                     self.set_pixel(xIndex, yIndex, color)
         pass
 
+    def drawTriangle_v2(self, x0, y0, z0, x1, y1, z1, x2, y2, z2, zBuffer,
+                        color: Tuple[int, int, int] = (255, 255, 255)):
+        xmin = min(x0, x1, x2) if min(x0, x1, x2) < 0 else 0
+        ymin = min(y0, y1, y2) if min(y0, y1, y2) < 0 else 0
+        xmax = max(x0, x1, x2) if max(x0, x1, x2) < self.width else self.width
+        ymax = max(y0, y1, y2) if max(y0, y1, y2) < self.height else self.height
+        for xIndex in range(round(xmin), round(xmax)):
+            for yIndex in range(round(ymin), round(ymax)):
+                bar1, bar2, bar3 = convertToBarycentric(xIndex, yIndex, x0, y0, x1, y1, x2, y2)
+                if bar1 > 0 and bar2 > 0 and bar3 > 0:
+                    sourceZ = bar1 * z0 + bar2 * z1 + bar3 * z2
+                    if sourceZ < zBuffer[xIndex, yIndex]:
+                        self.set_pixel(xIndex, yIndex, color)
+                        zBuffer[xIndex, yIndex] = sourceZ
+        pass
+
 
 def convertToBarycentric(x, y, x0: float, y0: float, x1: float, y1: float, x2: float, y2: float, eps=0.1):
     lambda0 = ((x1 - x2) * (y - y2) - (y1 - y2) * (x - x2)) / ((x1 - x2) * (y0 - y2) - (y1 - y2) * (x0 - x2))
@@ -227,11 +287,15 @@ def doLR2():
     obj.img.height = 1600
     obj.img.arr_init()
     # obj.draw_edges_v1("lr1/deer.obj", 650, 0, 1, -1)
-    obj.draw_edges_v2("lr1/deer.obj", 650, 0, 1, -1)
-    obj.img.save("lr2/deer_colored.jpg")
+    # obj.draw_edges_v2("lr1/deer.obj", 650, 0, 1, -1)
+    # obj.img.save("lr2/deer_colored.jpg")
+    obj.img.zBuffer_init()
+    obj.draw_edges_v3("lr1/deer.obj", 650, 0, 1, -1)
+    obj.img.save("lr2/deer_lighted_colored.jpg")
     obj.img.imshow()
 
 
 if __name__ == "__main__":
     doLR2()
+    print('done')
     pass
