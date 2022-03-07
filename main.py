@@ -75,8 +75,8 @@ class OBJ3DModel:
                                          self.vertexList[vertexIndexes[2] - 1].x,
                                          self.vertexList[vertexIndexes[2] - 1].y,
                                          self.vertexList[vertexIndexes[2] - 1].z)
-            sProduct = scalarProduct(nx, ny, nz, 0, 0, 1)
-            if (sProduct < 0):
+            cosine = scalarProduct(nx, ny, nz, 0, 0, 1)
+            if cosine < 0:
                 self.img.drawTriangle_v2(scaleX * self.vertexList[vertexIndexes[0] - 1].x - displacementX,
                                          scaleY * self.vertexList[vertexIndexes[0] - 1].y - displacementY,
                                          self.vertexList[vertexIndexes[0] - 1].z,
@@ -86,7 +86,7 @@ class OBJ3DModel:
                                          scaleX * self.vertexList[vertexIndexes[2] - 1].x - displacementX,
                                          scaleY * self.vertexList[vertexIndexes[2] - 1].y - displacementY,
                                          self.vertexList[vertexIndexes[2] - 1].z,
-                                         self.img.zBuffer, (255 * sProduct, 0, 0))
+                                         self.img.zBuffer, (-255 * cosine, 0, 0))
 
 
 class MyImage:
