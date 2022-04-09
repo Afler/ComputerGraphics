@@ -18,6 +18,12 @@ def scalarProduct(x0, y0, z0, x1, y1, z1):
     return res
 
 
+def projectiveTransformation(x, y, z, ax, ay, u0, v0, tz):
+    u = (ax * x + u0 * (z + tz)) / z
+    v = (ay * y + v0 * (z + tz)) / z
+    return u, v
+
+
 class OBJ3DModel:
     def __init__(self):
         self.vertexList: Optional[np.ndarray] = None
@@ -30,6 +36,73 @@ class OBJ3DModel:
 
     def arr_init(self):
         self.vertexList = np.zeros((self.height, self.width, self.channels), dtype=np.uint8)
+
+    def rotate(self, alpha, beta, gamma):
+        alpha *= np.pi / 180
+        beta *= np.pi / 180
+        gamma *= np.pi / 180
+        R = np.mat([[1.0, 0, 0], [0, np.cos(alpha), np.sin(alpha)], [0, -np.sin(alpha), np.cos(alpha)]]) \
+            * np.mat([[np.cos(beta), 0, np.sin(beta)], [0, 1.0, 0], [-np.sin(beta), 0, np.cos(beta)]]) \
+            * np.mat([[np.cos(gamma), np.sin(gamma), 0], [-np.sin(gamma), np.cos(gamma), 0], [0, 0, 1.0]])
+
+        coordinatesFinish = np.zeros((len(self.vertexList), 3), np.float64)
+        for i in range(len(self.vertexList)):
+            coordinatesFinish[i, 0] = self.vertexList[i].x
+            coordinatesFinish[i, 1] = self.vertexList[i].y
+            coordinatesFinish[i, 2] = self.vertexList[i].z
+        coordinatesFinish = coordinatesFinish.dot(R).getA()
+        for i in range(len(self.vertexList)):
+            self.vertexList[i].x = coordinatesFinish[i, 0]
+            self.vertexList[i].y = coordinatesFinish[i, 1]
+            self.vertexList[i].z = coordinatesFinish[i, 2]
+
+    def perspective(self, ax, ay, u0, v0, zsup):
+        for i in range(len(self.vertexList)):
+            self.vertexList[i].z += zsup
+            self.vertexList[i].x = (self.vertexList[i].x * ax) / self.vertexList[i].z + u0
+            self.vertexList[i].y = (self.vertexList[i].y * ay) / self.vertexList[i].z + v0
+            self.vertexList[i].z -= zsup
+
+    def centrilize(self):
+        x_max = y_max = z_max = -20000000.0
+        x_min = y_min = z_min = 20000000.0
+
+        for i in range(len(self.vertexList)):
+            if self.vertexList[i].x > x_max:
+                x_max = self.vertexList[i].x
+            if self.vertexList[i].y > y_max:
+                y_max = self.vertexList[i].y
+            if self.vertexList[i].z > z_max:
+                z_max = self.vertexList[i].z
+            if self.vertexList[i].x < x_min:
+                x_min = self.vertexList[i].x
+            if self.vertexList[i].y < y_min:
+                y_min = self.vertexList[i].y
+            if self.vertexList[i].z < z_min:
+                z_min = self.vertexList[i].z
+
+        x_min = x_max - (x_max - x_min) / 2
+        y_min = y_max - (y_max - y_min) / 2
+        z_min = z_max - (z_max - z_min) / 2
+
+        for i in range(len(self.vertexList)):
+            self.vertexList[i].x -= x_min
+            self.vertexList[i].y -= y_min
+            self.vertexList[i].z -= z_min
+
+    def normalize(self):
+        x = y = z = -20000000.0
+        for i in range(len(self.vertexList)):
+            if abs(self.vertexList[i].x > x):
+                x = abs(self.vertexList[i].x)
+            if abs(self.vertexList[i].y > y):
+                y = abs(self.vertexList[i].y)
+            if abs(self.vertexList[i].z > z):
+                z = abs(self.vertexList[i].z)
+        for i in range(len(self.vertexList)):
+            self.vertexList[i].x /= x
+            self.vertexList[i].y /= y
+            self.vertexList[i].z /= z
 
     def draw_edges_v1(self, path: str, displacementX=0, displacementY=0, scaleX=1, scaleY=1):
         self.read_model(path)
@@ -88,6 +161,37 @@ class OBJ3DModel:
                                          self.vertexList[vertexIndexes[2] - 1].z,
                                          self.img.zBuffer, (-255 * cosine, 0, 0))
 
+    def draw_projective_edges(self, path: str, displacementX=0, displacementY=0, scaleX=1, scaleY=1):
+        self.read_model(path)
+        self.centrilize()
+        self.normalize()
+        self.rotate(0, -45, 0)
+        self.perspective(2000, 2000, 0, 0, 3)
+        self.normalize()
+        for vertexIndexes in self.polyVertexIndexesList:
+            nx, ny, nz = calculateNormal(self.vertexList[vertexIndexes[0] - 1].x,
+                                         self.vertexList[vertexIndexes[0] - 1].y,
+                                         self.vertexList[vertexIndexes[0] - 1].z,
+                                         self.vertexList[vertexIndexes[1] - 1].x,
+                                         self.vertexList[vertexIndexes[1] - 1].y,
+                                         self.vertexList[vertexIndexes[1] - 1].z,
+                                         self.vertexList[vertexIndexes[2] - 1].x,
+                                         self.vertexList[vertexIndexes[2] - 1].y,
+                                         self.vertexList[vertexIndexes[2] - 1].z)
+            cosine = scalarProduct(nx, ny, nz, 0, 0, 1)
+            if cosine >= 0:
+                self.img.drawTriangle_v2(scaleX * self.vertexList[vertexIndexes[0] - 1].x - displacementX,
+                                         scaleY * self.vertexList[vertexIndexes[0] - 1].y - displacementY,
+                                         scaleX * self.vertexList[vertexIndexes[0] - 1].z,
+                                         scaleX * self.vertexList[vertexIndexes[1] - 1].x - displacementX,
+                                         scaleY * self.vertexList[vertexIndexes[1] - 1].y - displacementY,
+                                         scaleX * self.vertexList[vertexIndexes[1] - 1].z,
+                                         scaleX * self.vertexList[vertexIndexes[2] - 1].x - displacementX,
+                                         scaleY * self.vertexList[vertexIndexes[2] - 1].y - displacementY,
+                                         scaleX * self.vertexList[vertexIndexes[2] - 1].z,
+                                         self.img.zBuffer, (255 * cosine, 0, 0))
+
+
 
 class MyImage:
     def __init__(self):
@@ -101,7 +205,7 @@ class MyImage:
     # инициализация z буфера
     def zBuffer_init(self):
         self.zBuffer = np.zeros((self.height, self.width), dtype=np.float)
-        self.zBuffer[:, :] = 255
+        self.zBuffer[:, :] = 30000
 
     # инициализация массива методом библиотеки numpy
     def arr_init(self):
@@ -214,8 +318,21 @@ class MyImage:
         ymin = min(y0, y1, y2) if min(y0, y1, y2) < 0 else 0
         xmax = max(x0, x1, x2) if max(x0, x1, x2) < self.width else self.width
         ymax = max(y0, y1, y2) if max(y0, y1, y2) < self.height else self.height
-        for xIndex in range(round(xmin), round(xmax)):
-            for yIndex in range(round(ymin), round(ymax)):
+        if xmax < (-self.width):
+            xmax = -self.width
+        if ymax < (-self.height):
+            ymax = -self.height
+        if xmin < (-self.width):
+            xmin = -self.width
+        if ymin < (-self.height):
+            ymin = -self.height
+        for xIndex in range(int(xmin), int(xmax)):
+            for yIndex in range(int(ymin), int(ymax)):
+                if xIndex > 0:
+                    break
+                if yIndex > 0:
+                    break
+
                 bar1, bar2, bar3 = convertToBarycentric(xIndex, yIndex, x0, y0, x1, y1, x2, y2)
                 if bar1 > 0 and bar2 > 0 and bar3 > 0:
                     sourceZ = bar1 * z0 + bar2 * z1 + bar3 * z2
@@ -294,8 +411,22 @@ def doLR2():
     obj.img.save("lr2/deer_lighted_colored.jpg")
     obj.img.imshow()
 
+def doLR3():
+    # drawTriangle(300, 500, 20, 30, 150, 700)
+    obj = OBJ3DModel()
+    obj.img.width = 1600
+    obj.img.height = 1600
+    obj.img.arr_init()
+    # obj.draw_edges_v1("lr1/deer.obj", 650, 0, 1, -1)
+    # obj.draw_edges_v2("lr1/deer.obj", 650, 0, 1, -1)
+    # obj.img.save("lr2/deer_colored.jpg")
+    obj.img.zBuffer_init()
+    obj.draw_projective_edges("lr1/deer.obj", 800, 800, 400, -400)
+    obj.img.save("lr3/deer_lighted_colored_foved.jpg")
+    obj.img.imshow()
+
 
 if __name__ == "__main__":
-    doLR2()
+    doLR3()
     print('done')
     pass
